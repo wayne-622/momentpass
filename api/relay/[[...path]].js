@@ -24,7 +24,6 @@
  */
 
 import { put, del, list } from "@vercel/blob";
-import { generateClientTokenFromReadWriteToken } from "@vercel/blob/client";
 
 const PART_MAX = 20 * 1024 * 1024;   // 20MB 分片
 const TTL_MS = 24 * 3600 * 1000;     // 默认保留 24 小时
@@ -360,6 +359,7 @@ export default async function handler(request) {
         const expect = planParts(f.size, PART_MAX)[p];
         if (!expect || expect.size !== size) return errResp(400, "分片与文件大小不一致");
         const key = partKey(code, idx, p);
+        const { generateClientTokenFromReadWriteToken } = await import("@vercel/blob/client");
         const token = await generateClientTokenFromReadWriteToken({
           pathname: key,
           allowedContentTypes: ["application/octet-stream"],
