@@ -23,9 +23,8 @@
  *   - 无定时任务（Vercel 免费版无 cron），过期清理为惰性：每次 init 时顺带扫描删除过期包裹。
  */
 
-export const config = { runtime: "edge" };
-
 import { put, del, list } from "@vercel/blob";
+import { Readable } from "node:stream";
 
 const PART_MAX = 20 * 1024 * 1024;   // 20MB 分片
 const TTL_MS = 24 * 3600 * 1000;     // 默认保留 24 小时
@@ -298,7 +297,7 @@ function planParts(size, partSize) {
 
 /* ---------------- 路由处理 ---------------- */
 
-export default async function handler(request) {
+export async function handleRequest(request) {
   const url = new URL(request.url);
   const seg = url.pathname.split("/").filter(Boolean);
   const r = seg.slice(2); // 去掉 'api','relay'
@@ -465,4 +464,35 @@ export default async function handler(request) {
   }
 
   return errResp(404, "路由不存在");
+}
+
+
+/* Vercel Node.js Runtime 兼容层：把 Node req/res 包装成 Web Request/Response */
+export default async function handler(req, res) {
+  const host = req.headers.host || "localhost";
+  const url = "https://" + host + req.url;
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (Array.isArray(v)) v.forEach(val => headers.append(k, val));
+    else if (v != null) headers.set(k, String(v));
+  }
+  let bodyBuf;
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    bodyBuf = Buffer.concat(chunks);
+  }
+  const request = new Request(url, {
+    method: req.method || "GET",
+    headers,
+    body: bodyBuf && bodyBuf.length ? bodyBuf : undefined
+  });
+  const response = await handleRequest(request);
+  res.statusCode = response.status;
+  response.headers.forEach((v, k) => res.setHeader(k, v));
+  if (response.body) {
+    Readable.fromWeb(response.body).pipe(res);
+  } else {
+    res.end();
+  }
 }
