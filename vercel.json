@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/relay/**": {
+    "api/**/*.js": {
       "maxDuration": 60
     }
   }
