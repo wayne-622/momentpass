@@ -297,7 +297,8 @@ function planParts(size, partSize) {
 /* ---------------- 路由处理 ---------------- */
 
 export default async function handler(request) {
-  const url = new URL(request.url);
+  const host = request.headers.get("host") || "localhost";
+  const url = new URL(request.url, "https://" + host);
   const seg = url.pathname.split("/").filter(Boolean);
   const r = seg.slice(2); // 去掉 'api','relay'
   const method = request.method.toUpperCase();
