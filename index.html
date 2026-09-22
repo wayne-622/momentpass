@@ -841,7 +841,7 @@ $('#btn-cancel-wait').addEventListener('click',function(){
     cancelled=true;
     relayXhrs.forEach(function(x){try{x.abort()}catch(e){}});
     relayXhrs.clear();
-    if(relayCode&&base){try{fetch(base+'/api/relay/'+relayCode,{method:'DELETE'})}catch(e){}}
+    if(relayCode&&base){try{fetch(base+'/api/relay?action=delete&code='+relayCode,{method:'DELETE'})}catch(e){}}
     resetSendView();
     toast('已取消，云端上的暂存已删除');
     return;
@@ -1022,7 +1022,7 @@ async function relayUpload(){
   var payload={files:sendQueue.map(function(q){return {name:q.name,path:q.path,size:q.size,mime:q.file.type||'application/octet-stream'}})};
   var init;
   try{
-    var r=await fetch(base+'/api/relay/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var r=await fetch(base+'/api/relay?action=init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r.ok)throw new Error('HTTP '+r.status);
     init=await r.json();
   }catch(e){toast('无法连接离线投递服务（'+base+'），请确认站点已部署边缘函数');return}
@@ -1035,12 +1035,12 @@ async function relayUpload(){
   });
   var signed;
   try{
-    var ur=await fetch(base+'/api/relay/'+init.code+'/urls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:plan})});
+    var ur=await fetch(base+'/api/relay?action=urls&code='+init.code,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:plan})});
     if(!ur.ok)throw new Error('HTTP '+ur.status);
     signed=await ur.json();
   }catch(e){
     toast('申请上传地址失败：'+(e.message||'网络错误'));
-    try{fetch(base+'/api/relay/'+init.code,{method:'DELETE'})}catch(_){}return;
+    try{fetch(base+'/api/relay?action=delete&code='+init.code,{method:'DELETE'})}catch(_){}return;
   }
 
   relayMode=true;relayCode=init.code;cancelled=false;sending=true;
@@ -1075,11 +1075,11 @@ async function relayUpload(){
   if(cancelled){return} /* 取消按钮已中止上传、删除包裹并重置视图 */
   if(!okAll){
     rs.className='status-pill st-bad';rs.textContent='上传中断';
-    try{fetch(base+'/api/relay/'+init.code,{method:'DELETE'})}catch(e){}
+    try{fetch(base+'/api/relay?action=delete&code='+init.code,{method:'DELETE'})}catch(e){}
     return;
   }
   try{
-    var rc=await fetch(base+'/api/relay/'+init.code+'/complete',{
+    var rc=await fetch(base+'/api/relay?action=complete&code='+init.code,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({files:completeFiles})
     });
@@ -1235,7 +1235,7 @@ function tryRelay(code){
     toast('未找到在线设备，也未查询到离线包裹（请确认站点已部署边缘函数、分享码正确）');
     return;
   }
-  fetch(base+'/api/relay/'+code+'/meta',{cache:'no-store'}).then(function(r){
+  fetch(base+'/api/relay?action=meta&code='+code,{cache:'no-store'}).then(function(r){
     if(r.status===404)return null;
     if(!r.ok)throw new Error('HTTP '+r.status);
     return r.json();
@@ -1509,7 +1509,7 @@ $('#btn-save-all').addEventListener('click',function(){
   if(relayPkg){
     var m=relayPkg.meta,c=relayPkg.code,b=relayPkg.base;
     if(m.files.length===1){downloadRelayFile(m.files[0]);return}
-    if(m.totalSize<=ZIP_LIMIT){triggerBrowserDownload(b+'/api/relay/'+c+'/zip','瞬传-'+c+'.zip');return}
+    if(m.totalSize<=ZIP_LIMIT){triggerBrowserDownload(b+'/api/relay?action=zip&code='+c,'瞬传-'+c+'.zip');return}
     toast('包裹超过 '+fmtSize(ZIP_LIMIT)+'，请逐个下载（桌面端大文件自动流式写盘）');
     return;
   }

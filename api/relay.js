@@ -299,19 +299,19 @@ function planParts(size, partSize) {
 
 export async function handleRequest(request) {
   const url = new URL(request.url);
-  const seg = url.pathname.split("/").filter(Boolean);
-  const r = seg.slice(2); // 去掉 'api','relay'
   const method = request.method.toUpperCase();
+  const action = url.searchParams.get("action") || "";
+  const code = url.searchParams.get("code") || "";
 
   if (method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
 
-  if (r.length === 1 && r[0] === "ping" && method === "GET") {
+  if (action === "ping" && method === "GET") {
     return jsonResp({ ok: true, service: "shunchuan-relay-vercel", time: Date.now() });
   }
 
-  if (r.length === 1 && r[0] === "init" && method === "POST") {
+  if (action === "init" && method === "POST") {
     const body = await request.json();
     const files = validateFileList(body.files);
     const ttlMs = Number(body.ttlHours) > 0 && Number(body.ttlHours) <= 30 * 24
@@ -334,12 +334,10 @@ export async function handleRequest(request) {
     return jsonResp({ code, expiresAt: meta.expiresAt, partSize: PART_MAX });
   }
 
-  const code = r[0];
-  if (!code || !CODE_RE.test(code)) return errResp(404, "路由不存在");
-  const action = r[1];
+  if (!action || !CODE_RE.test(code)) return errResp(404, "路由不存在");
 
-  /* POST /api/relay/:code/urls —— 签发分片直传 clientToken（浏览器 PUT blob.vercel-storage.com） */
-  if (action === "urls" && method === "POST" && r.length === 2) {
+  /* POST /api/relay?action=urls&code=XXX —— 签发分片直传 clientToken */
+  if (action === "urls" && method === "POST") {
     const meta = await readMeta(code);
     if (!meta) return errResp(404, "包裹不存在 debug=" + JSON.stringify(readMeta._debug || {}));
     if (meta.status !== "uploading") return errResp(409, "包裹已完成，不能继续上传");
@@ -376,8 +374,8 @@ export async function handleRequest(request) {
     return jsonResp({ items: outItems });
   }
 
-  /* POST /api/relay/:code/complete */
-  if (action === "complete" && method === "POST" && r.length === 2) {
+  /* POST /api/relay?action=complete&code=XXX */
+  if (action === "complete" && method === "POST") {
     const meta = await readMeta(code);
     if (!meta) return errResp(404, "包裹不存在");
     if (meta.status !== "uploading") return errResp(409, "包裹已完成");
@@ -423,8 +421,8 @@ export async function handleRequest(request) {
     return jsonResp({ ok: true, code, expiresAt: ready.expiresAt, totalSize: ready.totalSize });
   }
 
-  /* GET /api/relay/:code/meta */
-  if (action === "meta" && method === "GET" && r.length === 2) {
+  /* GET /api/relay?action=meta&code=XXX */
+  if (action === "meta" && method === "GET") {
     const meta = await readMeta(code);
     if (!meta || meta.status !== "ready") return errResp(404, "包裹不存在或尚未上传完成");
     return jsonResp({
@@ -440,16 +438,16 @@ export async function handleRequest(request) {
     });
   }
 
-  /* DELETE /api/relay/:code */
-  if (!action && method === "DELETE" && r.length === 1) {
+  /* DELETE /api/relay?action=delete&code=XXX */
+  if (action === "delete" && method === "DELETE") {
     const meta = await readMeta(code);
     if (!meta) return jsonResp({ ok: true, code, existed: false });
     const removed = await deletePackage(code);
     return jsonResp({ ok: true, code, removed });
   }
 
-  /* GET/HEAD /api/relay/:code/zip */
-  if (action === "zip" && r.length === 2 && (method === "GET" || method === "HEAD")) {
+  /* GET/HEAD /api/relay?action=zip&code=XXX */
+  if (action === "zip" && (method === "GET" || method === "HEAD")) {
     const meta = await readMeta(code);
     if (!meta || meta.status !== "ready") return errResp(404, "包裹不存在或尚未上传完成");
     const headers = {
