@@ -487,12 +487,19 @@ export default async function handler(req, res) {
     headers,
     body: bodyBuf && bodyBuf.length ? bodyBuf : undefined
   });
-  const response = await handleRequest(request);
-  res.statusCode = response.status;
-  response.headers.forEach((v, k) => res.setHeader(k, v));
-  if (response.body) {
-    Readable.fromWeb(response.body).pipe(res);
-  } else {
-    res.end();
+  try {
+    const response = await handleRequest(request);
+    res.statusCode = response.status;
+    response.headers.forEach((v, k) => res.setHeader(k, v));
+    if (response.body) {
+      Readable.fromWeb(response.body).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (e) {
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.end(JSON.stringify({ error: String(e && e.message || e), stack: String(e && e.stack || "").slice(0, 2000) }));
   }
 }
