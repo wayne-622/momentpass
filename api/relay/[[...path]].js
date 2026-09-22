@@ -341,7 +341,7 @@ export async function handleRequest(request) {
   /* POST /api/relay/:code/urls —— 签发分片直传 clientToken（浏览器 PUT blob.vercel-storage.com） */
   if (action === "urls" && method === "POST" && r.length === 2) {
     const meta = await readMeta(code);
-    if (!meta) return errResp(404, "包裹不存在");
+    if (!meta) return errResp(404, "包裹不存在 debug=" + JSON.stringify(readMeta._debug || {}));
     if (meta.status !== "uploading") return errResp(409, "包裹已完成，不能继续上传");
     const body = await request.json();
     if (!body || !Array.isArray(body.items)) return errResp(400, "参数错误");
